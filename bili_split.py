@@ -32,10 +32,16 @@ import sys
 import tempfile
 import wave
 
-# ---- 默认工具路径（Windows 环境探测）----
-FFMPEG_DEFAULT = r"C:\Users\2504\.workbuddy\binaries\ffmpeg\ffmpeg-9.0.1-essentials_build\bin\ffmpeg.exe"
-YTDLP_DEFAULT = r"C:\Users\2504\.workbuddy\binaries\python\envs\default\Scripts\yt-dlp.exe"
-NODE_DEFAULT = r"C:\Users\2504\.workbuddy\binaries\node\versions\22.22.2\node.exe"
+# ---- 工具路径解析（环境变量 > PATH，无硬编码本机路径）----
+# 可设置: FFMPEG_PATH / YTDLP_PATH / NODE_PATH 指向本机工具
+def _tool_path(env_name):
+    v = os.environ.get(env_name, "").strip()
+    return v or None
+
+
+FFMPEG_DEFAULT = _tool_path("FFMPEG_PATH")
+YTDLP_DEFAULT = _tool_path("YTDLP_PATH")
+NODE_DEFAULT = _tool_path("NODE_PATH")
 
 # HuggingFace 模型走国内镜像（首次下载模型时显著加速）
 os.environ.setdefault("HF_ENDPOINT", "https://hf-mirror.com")
@@ -54,7 +60,10 @@ def find_exe(name, given, default):
     for c in cands:
         if c and os.path.exists(c):
             return c
-    raise SystemExit(f"找不到 {name}，请用 --{name} 参数指定路径")
+    env_hint = {"ffmpeg": "FFMPEG_PATH", "yt-dlp": "YTDLP_PATH",
+                "node": "NODE_PATH"}.get(name, name.upper() + "_PATH")
+    raise SystemExit(
+        f"找不到 {name}。请确保已加入 PATH，或设置环境变量 {env_hint}，或用 --{name} 参数指定路径")
 
 
 def parse_ts(s):

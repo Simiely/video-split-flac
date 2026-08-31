@@ -186,14 +186,14 @@ function refresh() {
       `python bili_split.py split \\`,
       `  --url "<span>${url}</span>" \\`,
       `  --cuts "<span>${cutsStr}</span>" \\`,
-      `  --model "D:\\workbuddy\\2026-08-31-10-15-43\\models\\faster-whisper-small" \\`,
+      `  --model "models/faster-whisper-small" \\`,
       `  --out ./output`,
       `</span>`
     ];
     cmd.innerHTML = lines.join("\n");
   }
   cmd.dataset.raw = urlOk && cuts.length && problems.length === 0
-    ? `python bili_split.py split --url "${url}" --cuts "${cutsStr}" --model "D:\\workbuddy\\2026-08-31-10-15-43\\models\\faster-whisper-small" --out ./output`
+    ? `python bili_split.py split --url "${url}" --cuts "${cutsStr}" --model "models/faster-whisper-small" --out ./output`
     : cutsStr ? `分段参数：${cutsStr}` : "";
 }
 

@@ -5,9 +5,9 @@
 
 ## 技术栈（精确版本）
 
-- Python 3.13.12（WorkBuddy managed venv：`C:\Users\2504\.workbuddy\binaries\python\envs\default`）
+- Python 3.13.12（推荐 WorkBuddy managed venv；`FFMPEG_PATH`/`YTDLP_PATH`/`NODE_PATH` 环境变量可指向本机工具）
 - yt-dlp 2026.07.04（需 node JS runtime + ffmpeg 位置）
-- ffmpeg 9.0.1（portable：`C:\Users\2504\.workbuddy\binaries\ffmpeg\ffmpeg-9.0.1-essentials_build\bin\`）
+- ffmpeg 9.0.1（portable 构建，`--ffmpeg` 参数或 PATH 均可）
 - faster-whisper 1.2.1（ctranslate2 4.8.1，CPU int8）
 - mutagen 1.48.1（FLAC 标签写入）
 - node 22.22.2（yt-dlp 的 JS 挑战解算 runtime）
