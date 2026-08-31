@@ -5,6 +5,7 @@
 | 子文件夹 | 视频 ID | 内容 | 生成日期 |
 |---|---|---|---|
 | [`ss2rbgXZbDk/`](ss2rbgXZbDk/) | ss2rbgXZbDk | 宝宝中文儿歌合集 23 首（flac + lrc + 封面 + 复现命令） | 2026-08-31 |
+| [`Ogb8PcUBwpE/`](Ogb8PcUBwpE/) | Ogb8PcUBwpE | 唱儿歌学中文 27 首（flac + lrc + 封面 + 复现命令） | 2026-08-31 |
 
 ## 约定
 
