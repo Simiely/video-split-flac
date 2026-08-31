@@ -1,5 +1,14 @@
 # CHANGELOG.md
 
+## [0.3.1] - 2026-08-31
+
+代码卫生（死代码 + magic number + 分发模式）。
+
+- 删除 `cmd_fetch` 中未使用的 `import ssl`（死代码，实证无调用）
+- magic number 常量化：`TITLE_TIMEOUT/SUBS_TIMEOUT/MODEL_DL_TIMEOUT/OVERLAP_TOLERANCE/COOKIE_EXPIRY/PROXY_DEFAULT`
+- main 分发升级：elif 链 → argparse 官方推荐 `set_defaults(func=...)` 模式
+- 验证：5 子命令分发 OK / selftest 通过 / fetch-model 路径无回归
+
 ## [0.3.0] - 2026-08-31
 
 代码结构优化（主线/支线分离 + 修复隐患）。
