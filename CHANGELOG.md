@@ -1,5 +1,11 @@
 # CHANGELOG.md
 
+## [0.1.3] - 2026-08-31
+
+- LYRICS 写入改为标准 LRC 完整头 [ti:][ar:][al:]（网易云音乐兼容，参考 MusicTag v1.0.9 写入格式）
+- build_lrc 支持 artist/album 头；新增 rebuild_lrc_header
+- songs/ 新增儿歌合集 23 首（flac + 同名 .lrc + 频道头像封面 + 复现命令 README）
+
 ## [0.1.2] - 2026-08-31
 
 输入模板页优化：分段时间拆成 时/分/秒 三个输入框（秒支持小数），免手动敲冒号；同步部署 GitHub Pages。
