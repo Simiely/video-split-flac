@@ -1,5 +1,38 @@
 # CHANGELOG.md
 
+## [0.3.8] - 2026-08-31
+
+songs 整理 + README 生成流程固化。
+
+- 新增 `organize_songs.py`：一条命令把 output 成品整理进 `songs/<视频ID>/`（flac + 同名 lrc + cover + README），README 含「时长」列 + 歌词来源标注（`--lyrics-source whisper|subs`）
+- `Ogb8PcUBwpE` 标注：歌词为 **Whisper 转写（非官方）**，该视频无字幕轨道，后续有官方歌词/更准转写再更新
+
+## [0.3.7] - 2026-08-31
+
+成品 FLAC 嵌入封面。
+
+- `write_flac_tags` 加 `cover` 参数：apply 时若 `output/cover.jpg` 存在，嵌入 FLAC `PICTURE`（front cover，type=3）
+- 封面来源：频道头像 `og:image`（900x900），由 `curl` 抓频道页提取
+- 歌曲库整理：新增 `songs/Ogb8PcUBwpE/`（唱儿歌学中文 27 首：flac + 同名 lrc + cover + README 复现命令）
+
+## [0.3.6] - 2026-08-31
+
+YouTube 高音质下载（PO Token + EJS）+ find_audio 修复。
+
+- `ytdlp_base` 加 `--remote-components ejs:github`：node runtime 需下载 EJS 签名求解脚本，否则 web/mweb client 报 "Signature solving failed / n challenge solving failed"
+- 高音质路径：`--yt-client mweb` + 本机 bgutil-ytdlp-pot-provider（PO Token，端口 4416）→ 解锁 251 opus 138k / 140 m4a 129k（SABR-only 时代 web/android/ios 均缺 URL，仅 mweb+PO Token 拿得到完整格式）
+- 修复 `find_audio` 误抓 `*.part` 残留：下载中断留下的 .part 会被当成音轨，导致切割后半段全空（seg 后半 8.7KB 空文件）
+- 实测：YouTube 音乐合集类视频 `--list-subs` 确认无字幕轨道，`--subs-lang` 会立即回退 Whisper
+
+## [0.3.5] - 2026-08-31
+
+成品 FLAC 结尾静音缓冲。
+
+- 新增 `split --tail-pad <秒>`（默认 3.0）：`cut_flac` 用 `apad=pad_dur` 在每段成品 FLAC 结尾追加静音（儿歌等结尾不显急促）
+- 只作用于成品 FLAC；whisper 转写走 `cut_wav16` 不受影响，歌词时间戳保持原样
+- 设 `--tail-pad 0` 关闭，恢复原精确截止行为
+- 验证：合成 6s 正弦波切 0-3s + pad 3s → 输出 6.00s（3s 内容 + 3s 静音）
+
 ## [0.3.4] - 2026-08-31
 
 场景走查（scenario-walkthrough v3 方案）。
