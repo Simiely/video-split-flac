@@ -16,3 +16,7 @@ test_apply_out/
 # 本地工具 / 临时
 .workbuddy/
 *.tmp
+
+# 临时核查脚本
+check_repo_tmp.js
+*tmp*.js
