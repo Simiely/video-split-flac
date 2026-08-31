@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>B站视频分段 · 输入模板</title>
+<style>
+  :root {
+    --bg: #1a1a20;
+    --card: #232330;
+    --card2: #2a2a3a;
+    --border: #3a3a4e;
+    --text: #e8e8f0;
+    --muted: #9a9ab0;
+    --accent: #ff9292;
+    --accent-dim: rgba(255, 146, 146, .12);
+    --ok: #6fd98c;
+    --err: #ff6b6b;
+    --mono: "Cascadia Code", Consolas, "JetBrains Mono", monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    min-height: 100vh; padding: 24px 16px 60px;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; }
+  h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+  .sub { color: var(--muted); font-size: 13px; margin-bottom: 24px; line-height: 1.7; }
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 14px; padding: 18px; margin-bottom: 16px;
+  }
+  .card h2 { font-size: 14px; color: var(--accent); margin-bottom: 12px; letter-spacing: .5px; }
+  label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+  input {
+    width: 100%; background: var(--card2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 9px;
+    padding: 10px 12px; font-size: 14px; outline: none;
+    font-family: var(--mono);
+  }
+  input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
+  input.invalid { border-color: var(--err); }
+  .row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .row input { flex: 1; }
+  .row .sep { color: var(--muted); font-size: 13px; }
+  .btn {
+    background: var(--accent); color: #1a1a20; border: none; border-radius: 9px;
+    padding: 8px 14px; font-size: 13px; font-weight: 700; cursor: pointer;
+    transition: filter .15s; white-space: nowrap;
+  }
+  .btn:hover { filter: brightness(1.1); }
+  .btn.ghost {
+    background: transparent; color: var(--muted); border: 1px dashed var(--border);
+    font-weight: 400; width: 100%; margin-top: 4px;
+  }
+  .btn.ghost:hover { color: var(--accent); border-color: var(--accent); }
+  .btn.del {
+    background: transparent; color: var(--muted); border: 1px solid var(--border);
+    font-size: 15px; padding: 7px 10px; line-height: 1;
+  }
+  .btn.del:hover { color: var(--err); border-color: var(--err); }
+  .preview {
+    background: #14141c; border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px; font-family: var(--mono); font-size: 12.5px;
+    line-height: 1.8; color: #c8c8e0; white-space: pre-wrap; word-break: break-all;
+    max-height: 260px; overflow-y: auto;
+  }
+  .preview .hl { color: var(--accent); }
+  .preview .dim { color: var(--muted); }
+  .copied { color: var(--ok); font-size: 12px; margin-left: 8px; }
+  .tip { color: var(--muted); font-size: 12px; line-height: 1.8; margin-top: 10px; }
+  .tip b { color: var(--accent); font-weight: 600; }
+  .rowhead { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .errline { color: var(--err); font-size: 12px; margin-top: 8px; min-height: 18px; }
+  .chip { display: inline-block; background: var(--accent-dim); color: var(--accent);
+    border-radius: 6px; padding: 2px 8px; font-size: 11px; margin: 0 4px 4px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🎬 视频分段 · 输入模板（B站 / YouTube）</h1>
+  <div class="sub">填好下面两项 → 底部实时生成命令 → 一键复制发给我即可。时间格式支持 <b>mm:ss</b> 或 <b>hh:mm:ss</b>，如 <span class="chip">12:34</span><span class="chip">1:02:03</span>。YouTube 链接会自动走本机代理下载。</div>
+
+  <div class="card">
+    <h2>① 视频链接</h2>
+    <label>支持 B 站（URL 或 BV 号）与 YouTube（watch/shorts/youtu.be）</label>
+    <input id="url" type="text" placeholder="https://www.bilibili.com/video/BV1xxxxxxxx 或 https://www.youtube.com/watch?v=xxxx 或 BV1xxxxxxxx" value="">
+  </div>
+
+  <div class="card">
+    <div class="rowhead">
+      <h2 style="margin:0">② 分段时间戳</h2>
+      <button class="btn" id="addBtn">＋ 添加分段</button>
+    </div>
+    <div id="rows"></div>
+    <div class="errline" id="err"></div>
+  </div>
+
+  <div class="card">
+    <h2>③ 生成的命令（复制发我）</h2>
+    <div class="preview" id="cmd"></div>
+    <div style="margin-top:10px; display:flex; align-items:center;">
+      <button class="btn" id="copyBtn">📋 复制命令</button>
+      <span class="copied" id="copied"></span>
+    </div>
+    <div class="tip">
+      <b>纯文本输入示例</b>（不想用页面时，直接按这个格式打字发我也行）：
+      <br>链接：https://www.bilibili.com/video/BV1xxxxxxxx
+      <br>分段：0:00-12:34, 12:34-25:00, 25:00-40:12
+      <br>（每段用逗号分隔，段与段之间可以留空档，不必首尾相接）
+    </div>
+  </div>
+</div>
+
+<script>
+const TS = /^(\d{1,2}:)?\d{1,2}:\d{1,2}(\.\d+)?$/;
+let n = 0;
+
+function addRow(s = "", e = "") {
+  const div = document.createElement("div");
+  div.className = "row";
+  div.innerHTML = `
+    <input class="ts start" placeholder="开始 如 0:00" value="${s}">
+    <span class="sep">→</span>
+    <input class="ts end" placeholder="结束 如 12:34" value="${e}">
+    <button class="btn del" title="删除此段">✕</button>`;
+  div.querySelector(".del").onclick = () => { div.remove(); refresh(); };
+  div.querySelectorAll(".ts").forEach(inp => {
+    inp.oninput = () => { validate(inp); refresh(); };
+  });
+  document.getElementById("rows").appendChild(div);
+  n++;
+  refresh();
+}
+
+function validate(inp) {
+  const v = inp.value.trim();
+  const ok = v === "" || TS.test(v);
+  inp.classList.toggle("invalid", !ok);
+  return ok;
+}
+
+function secs(t) {
+  const p = t.split(":").map(x => parseFloat(x));
+  return p.length === 3 ? p[0]*3600 + p[1]*60 + p[2] : p[0]*60 + p[1];
+}
+
+function refresh() {
+  const err = document.getElementById("err");
+  const url = document.getElementById("url").value.trim();
+  const rows = [...document.querySelectorAll(".row")];
+  let cuts = [], problems = [];
+  rows.forEach((r, i) => {
+    const [st, en] = r.querySelectorAll(".ts");
+    const sv = st.value.trim(), ev = en.value.trim();
+    const sok = validate(st), eok = validate(en);
+    if (!sv && !ev) return;
+    if (!sok || !eok) { problems.push(`第 ${i+1} 段时间格式不对（应为 mm:ss 或 hh:mm:ss）`); return; }
+    if (!sv || !ev) { problems.push(`第 ${i+1} 段缺开始或结束时间`); return; }
+    if (secs(ev) <= secs(sv)) { problems.push(`第 ${i+1} 段结束必须晚于开始`); return; }
+    if (i > 0) {
+      const prevEnd = cuts[cuts.length-1].split("-")[1];
+      if (secs(sv) < secs(prevEnd)) problems.push(`第 ${i+1} 段与上一段时间重叠`);
+    }
+    cuts.push(`${sv}-${ev}`);
+  });
+  err.textContent = problems.join("；");
+
+  const cutsStr = cuts.join(", ");
+  const urlOk = /bilibili\.com\/video\/|^BV[0-9A-Za-z]{10}$|youtube\.com\/(watch\?v=|shorts\/|embed\/)|youtu\.be\//.test(url);
+  const ready = urlOk && cuts.length > 0 && problems.length === 0;
+
+  const cmd = document.getElementById("cmd");
+  if (!url) {
+    cmd.innerHTML = `<span class="dim">// 等待输入视频链接...</span>`;
+  } else if (!urlOk) {
+    cmd.innerHTML = `<span class="dim">// 链接格式不对：应为 bilibili.com/video/... 、BV号、youtube.com/watch 或 youtu.be 链接</span>`;
+  } else if (!cuts.length) {
+    cmd.innerHTML = `<span class="dim">// 等待添加分段（点击上方"＋ 添加分段"）</span>`;
+  } else {
+    const lines = [
+      `<span class="hl">分段参数：</span><span>${cutsStr || "(空)"}</span>`,
+      ``,
+      `<span class="hl">完整命令：</span>`,
+      `python bili_split.py split \\`,
+      `  --url "<span>${url}</span>" \\`,
+      `  --cuts "<span>${cutsStr}</span>" \\`,
+      `  --model "D:\\workbuddy\\2026-08-31-10-15-43\\models\\faster-whisper-small" \\`,
+      `  --out ./output`,
+      `</span>`
+    ];
+    cmd.innerHTML = lines.join("\n");
+  }
+  cmd.dataset.raw = urlOk && cuts.length && problems.length === 0
+    ? `python bili_split.py split --url "${url}" --cuts "${cutsStr}" --model "D:\\workbuddy\\2026-08-31-10-15-43\\models\\faster-whisper-small" --out ./output`
+    : cutsStr ? `分段参数：${cutsStr}` : "";
+}
+
+document.getElementById("addBtn").onclick = () => addRow();
+document.getElementById("url").oninput = refresh;
+document.getElementById("copyBtn").onclick = async () => {
+  const raw = document.getElementById("cmd").dataset.raw;
+  const c = document.getElementById("copied");
+  if (!raw) { c.textContent = "先填好链接和分段"; setTimeout(()=>c.textContent="", 2000); return; }
+  try {
+    await navigator.clipboard.writeText(raw);
+  } catch (e) {
+    const ta = document.createElement("textarea");
+    ta.value = raw; document.body.appendChild(ta); ta.select();
+    document.execCommand("copy"); ta.remove();
+  }
+  c.textContent = "已复制 ✓ 直接粘贴发我";
+  setTimeout(()=>c.textContent="", 2500);
+};
+
+// 默认给 3 行示例（带说明的占位可直接改）
+addRow("0:00", "12:34");
+addRow("12:34", "25:00");
+addRow("25:00", "40:12");
+</script>
+</body>
+</html>

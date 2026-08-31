@@ -1,0 +1,18 @@
+# 模型与运行时
+models/
+__pycache__/
+*.pyc
+
+# 敏感凭证（绝不入库）
+cookies.txt
+youtube_cookies.json
+*_cookies.json
+
+# 演示 / 输出产物
+yt_demo*/
+output/
+test_apply_out/
+
+# 本地工具 / 临时
+.workbuddy/
+*.tmp
