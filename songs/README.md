@@ -39,4 +39,4 @@ python bili_split.py split --url "https://www.youtube.com/watch?v=ss2rbgXZbDk" -
 | 23 | 小星星 | 1:49 |
 
 ---
-歌词来源：YouTube 官方字幕（zh-Hant 转简体）；每首内嵌 LYRICS（标准 LRC 头）+ UNSYNCEDLYRICS + 频道头像封面 + 同名 .lrc（网易云兼容）。
+歌词来源：YouTube 官方字幕（zh-Hant 转简体）；每首内嵌 LYRICS（标准 LRC 头）+ UNSYNCEDLYRICS + 频道头像封面（[cover.jpg](cover.jpg)，已嵌入每首 flac）+ 同名 .lrc（网易云兼容）。
