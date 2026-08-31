@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>B站视频分段 · 输入模板</title>
+<title>视频分段 · 输入模板</title>
 <style>
   :root {
     --bg: #1a1a20;
@@ -24,7 +24,7 @@
     font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
     min-height: 100vh; padding: 24px 16px 60px;
   }
-  .wrap { max-width: 760px; margin: 0 auto; }
+  .wrap { max-width: 820px; margin: 0 auto; }
   h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
   .sub { color: var(--muted); font-size: 13px; margin-bottom: 24px; line-height: 1.7; }
   .card {
@@ -34,30 +34,29 @@
   .card h2 { font-size: 14px; color: var(--accent); margin-bottom: 12px; letter-spacing: .5px; }
   label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
   input {
-    width: 100%; background: var(--card2); color: var(--text);
+    background: var(--card2); color: var(--text);
     border: 1px solid var(--border); border-radius: 9px;
     padding: 10px 12px; font-size: 14px; outline: none;
     font-family: var(--mono);
   }
   input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
   input.invalid { border-color: var(--err); }
-  .row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
-  .row input { flex: 1; }
-  .row .sep { color: var(--muted); font-size: 13px; }
+  #url { width: 100%; }
+  .row { display: flex; gap: 3px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
+  .tsnum { width: 46px; text-align: center; padding: 8px 2px; font-size: 14px; }
+  .tsnum::-webkit-outer-spin-button, .tsnum::-webkit-inner-spin-button { -webkit-appearance: none; }
+  .unit { color: var(--muted); font-size: 11px; margin-right: 6px; user-select: none; }
+  .lbl { color: var(--muted); font-size: 12px; margin-right: 2px; user-select: none; }
+  .sep { color: var(--muted); font-size: 14px; margin: 0 8px; user-select: none; }
   .btn {
     background: var(--accent); color: #1a1a20; border: none; border-radius: 9px;
     padding: 8px 14px; font-size: 13px; font-weight: 700; cursor: pointer;
     transition: filter .15s; white-space: nowrap;
   }
   .btn:hover { filter: brightness(1.1); }
-  .btn.ghost {
-    background: transparent; color: var(--muted); border: 1px dashed var(--border);
-    font-weight: 400; width: 100%; margin-top: 4px;
-  }
-  .btn.ghost:hover { color: var(--accent); border-color: var(--accent); }
   .btn.del {
     background: transparent; color: var(--muted); border: 1px solid var(--border);
-    font-size: 15px; padding: 7px 10px; line-height: 1;
+    font-size: 15px; padding: 7px 10px; line-height: 1; margin-left: 6px;
   }
   .btn.del:hover { color: var(--err); border-color: var(--err); }
   .preview {
@@ -72,6 +71,7 @@
   .tip { color: var(--muted); font-size: 12px; line-height: 1.8; margin-top: 10px; }
   .tip b { color: var(--accent); font-weight: 600; }
   .rowhead { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .rowhead h2 { margin: 0; }
   .errline { color: var(--err); font-size: 12px; margin-top: 8px; min-height: 18px; }
   .chip { display: inline-block; background: var(--accent-dim); color: var(--accent);
     border-radius: 6px; padding: 2px 8px; font-size: 11px; margin: 0 4px 4px 0; }
@@ -80,17 +80,17 @@
 <body>
 <div class="wrap">
   <h1>🎬 视频分段 · 输入模板（B站 / YouTube）</h1>
-  <div class="sub">填好下面两项 → 底部实时生成命令 → 一键复制发给我即可。时间格式支持 <b>mm:ss</b> 或 <b>hh:mm:ss</b>，如 <span class="chip">12:34</span><span class="chip">1:02:03</span>。YouTube 链接会自动走本机代理下载。</div>
+  <div class="sub">填好下面两项 → 底部实时生成命令 → 一键复制发给我。时间拆成 <b>时/分/秒</b> 三个框，秒支持小数（如 <span class="chip">12.5</span>）。</div>
 
   <div class="card">
     <h2>① 视频链接</h2>
     <label>支持 B 站（URL 或 BV 号）与 YouTube（watch/shorts/youtu.be）</label>
-    <input id="url" type="text" placeholder="https://www.bilibili.com/video/BV1xxxxxxxx 或 https://www.youtube.com/watch?v=xxxx 或 BV1xxxxxxxx" value="">
+    <input id="url" type="text" placeholder="https://www.bilibili.com/video/BV1xxxxxxxx 或 https://www.youtube.com/watch?v=xxxx" value="">
   </div>
 
   <div class="card">
     <div class="rowhead">
-      <h2 style="margin:0">② 分段时间戳</h2>
+      <h2>② 分段时间戳</h2>
       <button class="btn" id="addBtn">＋ 添加分段</button>
     </div>
     <div id="rows"></div>
@@ -105,65 +105,113 @@
       <span class="copied" id="copied"></span>
     </div>
     <div class="tip">
-      <b>纯文本输入示例</b>（不想用页面时，直接按这个格式打字发我也行）：
-      <br>链接：https://www.bilibili.com/video/BV1xxxxxxxx
-      <br>分段：0:00-12:34, 12:34-25:00, 25:00-40:12
-      <br>（每段用逗号分隔，段与段之间可以留空档，不必首尾相接）
+      <b>不用页面也行</b>——直接打字发我，格式：分段 <b>0:00-12:34, 12:34-25:00, 25:00-40:12</b>（每段用逗号分隔，可留空档）。
     </div>
   </div>
 </div>
 
 <script>
-const TS = /^(\d{1,2}:)?\d{1,2}:\d{1,2}(\.\d+)?$/;
 let n = 0;
 
-function addRow(s = "", e = "") {
+function addRow() {
   const div = document.createElement("div");
   div.className = "row";
   div.innerHTML = `
-    <input class="ts start" placeholder="开始 如 0:00" value="${s}">
+    <span class="lbl">开始</span>
+    <input class="tsnum s h" placeholder="时">
+    <span class="unit">时</span>
+    <input class="tsnum s m" placeholder="分">
+    <span class="unit">分</span>
+    <input class="tsnum s s2" placeholder="秒">
+    <span class="unit">秒</span>
     <span class="sep">→</span>
-    <input class="ts end" placeholder="结束 如 12:34" value="${e}">
+    <span class="lbl">结束</span>
+    <input class="tsnum e h" placeholder="时">
+    <span class="unit">时</span>
+    <input class="tsnum e m" placeholder="分">
+    <span class="unit">分</span>
+    <input class="tsnum e s2" placeholder="秒">
+    <span class="unit">秒</span>
     <button class="btn del" title="删除此段">✕</button>`;
   div.querySelector(".del").onclick = () => { div.remove(); refresh(); };
-  div.querySelectorAll(".ts").forEach(inp => {
-    inp.oninput = () => { validate(inp); refresh(); };
+  div.querySelectorAll(".tsnum").forEach(inp => {
+    inp.oninput = () => { validateTs(inp); refresh(); };
   });
   document.getElementById("rows").appendChild(div);
   n++;
   refresh();
 }
 
-function validate(inp) {
+// 单框校验: 时=整数, 分/秒=0-59(秒可带小数)
+function validateTs(inp) {
   const v = inp.value.trim();
-  const ok = v === "" || TS.test(v);
+  const cls = inp.classList;
+  const isS = cls.contains("s2");
+  const isH = cls.contains("h");
+  let ok = v === "";
+  if (!ok) {
+    if (isH) ok = /^\d+$/.test(v);
+    else if (isS) ok = /^\d{1,2}(\.\d{1,2})?$/.test(v) && parseFloat(v) < 60;
+    else ok = /^\d{1,2}$/.test(v) && parseInt(v, 10) < 60;
+  }
   inp.classList.toggle("invalid", !ok);
   return ok;
 }
 
-function secs(t) {
-  const p = t.split(":").map(x => parseFloat(x));
-  return p.length === 3 ? p[0]*3600 + p[1]*60 + p[2] : p[0]*60 + p[1];
+// 读取一端的三个框 -> {h,m,s,empty}
+function readTs(r, prefix) {
+  const h = r.querySelector("." + prefix + ".h").value.trim();
+  const m = r.querySelector("." + prefix + ".m").value.trim();
+  const s = r.querySelector("." + prefix + ".s2").value.trim();
+  return { h, m, s, empty: !h && !m && !s };
+}
+
+function tsToSec(o) {
+  return (parseInt(o.h || 0) * 3600) + (parseInt(o.m || 0) * 60) + parseFloat(o.s || 0);
+}
+
+function tsToStr(o) {
+  const h = parseInt(o.h || 0), m = parseInt(o.m || 0), s = parseFloat(o.s || 0);
+  const ss = Number.isInteger(s) ? String(Math.floor(s)).padStart(2, "0") : s.toFixed(2);
+  return h > 0
+    ? h + ":" + String(m).padStart(2, "0") + ":" + ss
+    : String(m).padStart(2, "0") + ":" + ss;
 }
 
 function refresh() {
   const err = document.getElementById("err");
   const url = document.getElementById("url").value.trim();
   const rows = [...document.querySelectorAll(".row")];
-  let cuts = [], problems = [];
+  const cuts = [];
+  const problems = [];
+  let prevEnd = null;
+
   rows.forEach((r, i) => {
-    const [st, en] = r.querySelectorAll(".ts");
-    const sv = st.value.trim(), ev = en.value.trim();
-    const sok = validate(st), eok = validate(en);
-    if (!sv && !ev) return;
-    if (!sok || !eok) { problems.push(`第 ${i+1} 段时间格式不对（应为 mm:ss 或 hh:mm:ss）`); return; }
-    if (!sv || !ev) { problems.push(`第 ${i+1} 段缺开始或结束时间`); return; }
-    if (secs(ev) <= secs(sv)) { problems.push(`第 ${i+1} 段结束必须晚于开始`); return; }
-    if (i > 0) {
-      const prevEnd = cuts[cuts.length-1].split("-")[1];
-      if (secs(sv) < secs(prevEnd)) problems.push(`第 ${i+1} 段与上一段时间重叠`);
+    const sObj = readTs(r, "s"), eObj = readTs(r, "e");
+    if (sObj.empty && eObj.empty) return;
+    if (sObj.empty || eObj.empty) {
+      problems.push(`第 ${i + 1} 段：开始/结束必须都填`);
+      return;
     }
-    cuts.push(`${sv}-${ev}`);
+    // 校验范围 (空值在 tsToSec 按 0 处理, 单框不合法由 validateTs 标红)
+    let bad = false;
+    ["h", "m", "s2"].forEach(k => {
+      const el = r.querySelector(".s." + k);
+      if (!validateTs(el)) { bad = true; }
+      if (!validateTs(r.querySelector(".e." + k))) { bad = true; }
+    });
+    if (bad) { problems.push(`第 ${i + 1} 段时间不合法（分/秒 0-59，秒可小数）`); return; }
+    const sSec = tsToSec(sObj), eSec = tsToSec(eObj);
+    if (eSec <= sSec) {
+      problems.push(`第 ${i + 1} 段：结束必须晚于开始`);
+      return;
+    }
+    if (prevEnd !== null && sSec < prevEnd) {
+      problems.push(`第 ${i + 1} 段与上一段时间重叠`);
+      return;
+    }
+    prevEnd = eSec;
+    cuts.push(tsToStr(sObj) + "-" + tsToStr(eObj));
   });
   err.textContent = problems.join("；");
 
@@ -179,8 +227,8 @@ function refresh() {
   } else if (!cuts.length) {
     cmd.innerHTML = `<span class="dim">// 等待添加分段（点击上方"＋ 添加分段"）</span>`;
   } else {
-    const lines = [
-      `<span class="hl">分段参数：</span><span>${cutsStr || "(空)"}</span>`,
+    cmd.innerHTML = [
+      `<span class="hl">分段参数：</span><span>${cutsStr}</span>`,
       ``,
       `<span class="hl">完整命令：</span>`,
       `python bili_split.py split \\`,
@@ -189,10 +237,9 @@ function refresh() {
       `  --model "models/faster-whisper-small" \\`,
       `  --out ./output`,
       `</span>`
-    ];
-    cmd.innerHTML = lines.join("\n");
+    ].join("\n");
   }
-  cmd.dataset.raw = urlOk && cuts.length && problems.length === 0
+  cmd.dataset.raw = ready
     ? `python bili_split.py split --url "${url}" --cuts "${cutsStr}" --model "models/faster-whisper-small" --out ./output`
     : cutsStr ? `分段参数：${cutsStr}` : "";
 }
@@ -202,7 +249,7 @@ document.getElementById("url").oninput = refresh;
 document.getElementById("copyBtn").onclick = async () => {
   const raw = document.getElementById("cmd").dataset.raw;
   const c = document.getElementById("copied");
-  if (!raw) { c.textContent = "先填好链接和分段"; setTimeout(()=>c.textContent="", 2000); return; }
+  if (!raw) { c.textContent = "先填好链接和分段"; setTimeout(() => c.textContent = "", 2000); return; }
   try {
     await navigator.clipboard.writeText(raw);
   } catch (e) {
@@ -211,13 +258,13 @@ document.getElementById("copyBtn").onclick = async () => {
     document.execCommand("copy"); ta.remove();
   }
   c.textContent = "已复制 ✓ 直接粘贴发我";
-  setTimeout(()=>c.textContent="", 2500);
+  setTimeout(() => c.textContent = "", 2500);
 };
 
-// 默认给 3 行示例（带说明的占位可直接改）
-addRow("0:00", "12:34");
-addRow("12:34", "25:00");
-addRow("25:00", "40:12");
+// 默认给 3 行示例
+addRow();
+addRow();
+addRow();
 </script>
 </body>
 </html>
