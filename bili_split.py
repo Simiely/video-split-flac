@@ -135,11 +135,17 @@ def ffmpeg_cmd(exe, args):
     return [exe, "-hide_banner", "-loglevel", "error", "-y"] + args
 
 
-def cut_flac(ffmpeg, src_wav, out_flac, start, end):
-    """从解码后的 wav 精确切割为 flac（-ss/-to 放 -i 前, 采样级精确）"""
-    run(ffmpeg_cmd(ffmpeg, ["-ss", f"{start:.3f}", "-to", f"{end:.3f}",
-                            "-i", src_wav, "-vn", "-c:a", "flac",
-                            "-compression_level", "8", out_flac]))
+def cut_flac(ffmpeg, src_wav, out_flac, start, end, tail_pad=0.0):
+    """从解码后的 wav 精确切割为 flac（-ss/-to 放 -i 前, 采样级精确）。
+
+    tail_pad>0 时用 apad 滤镜在结尾追加静音（成品 FLAC 尾部缓冲），
+    不影响歌词时间戳（whisper 走 cut_wav16 不追加）。
+    """
+    cmd = ["-ss", f"{start:.3f}", "-to", f"{end:.3f}", "-i", src_wav, "-vn"]
+    if tail_pad > 0:
+        cmd += ["-af", f"apad=pad_dur={tail_pad:.3f}"]
+    cmd += ["-c:a", "flac", "-compression_level", "8", out_flac]
+    run(ffmpeg_cmd(ffmpeg, cmd))
 
 
 def cut_wav16(ffmpeg, src_wav, out_wav, start, end):
@@ -203,17 +209,21 @@ def find_node():
 
 
 def ytdlp_base(ytdlp, ffmpeg_bin, proxy, site, yt_client="android"):
-    """yt-dlp 统一基础参数: ffmpeg 路径 / node JS runtime / 代理 / YouTube player client"""
+    """yt-dlp 统一基础参数: ffmpeg 路径 / node JS runtime / EJS 签名求解 / 代理 / YouTube player client"""
     cmd = [ytdlp, "--no-playlist"]
     if ffmpeg_bin:
         cmd += ["--ffmpeg-location", ffmpeg_bin]
     node = find_node()
     if node:
         cmd += ["--js-runtimes", f"node:{node}"]
+    # EJS: YouTube 签名求解的 JS challenge solver 脚本 (node runtime 需下载该脚本)
+    cmd += ["--remote-components", "ejs:github"]
     if proxy:
         cmd += ["--proxy", proxy]
     if site == "youtube":
-        # android: 代理 IP 下绕过 bot 检测(稳定但只有低清muxed); tv: 配 cookie 可解锁 1080p+128k 音频
+        # android: 代理 IP 下绕过 bot 检测(稳定但只有低清 muxed 22k)
+        # mweb: 配合 PO Token(bgutil provider) 可解锁 128k/138k 音频 (当前 SABR 时代最稳的高音质 client)
+        # tv: 配 cookie 可解锁 1080p+128k 音频, 但易被限流
         cmd += ["--extractor-args", f"youtube:player_client={yt_client}"]
     return cmd
 
@@ -408,9 +418,12 @@ def resolve_yt_client(site, has_cookie, given):
 
 
 def find_audio(tmp):
-    """在 tmp 目录定位 yt-dlp 下载的音轨文件 (audio.*)"""
+    """在 tmp 目录定位 yt-dlp 下载的音轨文件 (audio.*)。
+
+    排除 *.part 残留 (下载中断的临时文件), 否则会误抓到不完整音轨导致切割出空段。
+    """
     for f in os.listdir(tmp):
-        if f.startswith("audio."):
+        if f.startswith("audio.") and not f.endswith(".part"):
             return os.path.join(tmp, f)
     return None
 
@@ -490,7 +503,8 @@ def cmd_split(args):
     segments = []
     for i, (s, e) in enumerate(cuts, 1):
         tag = f"seg_{i:02d}"
-        cut_flac(ffmpeg, full_hi, os.path.join(outdir, f"{tag}.flac"), s, e)
+        cut_flac(ffmpeg, full_hi, os.path.join(outdir, f"{tag}.flac"), s, e,
+                 args.tail_pad)
         cut_wav16(ffmpeg, full_16k, os.path.join(tmp, f"{tag}_w16.wav"), s, e)
         segments.append({"idx": i, "tag": tag, "start": s, "end": e,
                          "start_str": f"{s:.3f}", "end_str": f"{e:.3f}",
@@ -521,7 +535,7 @@ def cmd_split(args):
     return outdir
 
 
-def write_flac_tags(path, title="", artist="", lyrics_lrc="", comment="", lyrics_plain=""):
+def write_flac_tags(path, title="", artist="", lyrics_lrc="", comment="", lyrics_plain="", cover=None):
     """用 mutagen 写 FLAC Vorbis Comment 标签 (embedded 嵌入)。
 
     歌词字段说明 (FLAC 无官方字段, 两个事实标准):
@@ -530,8 +544,10 @@ def write_flac_tags(path, title="", artist="", lyrics_lrc="", comment="", lyrics
       - UNSYNCEDLYRICS:    Mp3tag / Bandcamp 阵营, 写入纯文本歌词(静态整块)
     双写以最大化兼容; 字段名必须大写 (小写 lyrics 多数播放器不认)。
     参考: MusicBrainz Picard 源码注释 "We read both but always write LYRICS"
+
+    cover: 传入封面图片路径 (如 cover.jpg), 存在则嵌入 FLAC PICTURE (front cover)。
     """
-    from mutagen.flac import FLAC
+    from mutagen.flac import FLAC, Picture
     f = FLAC(path)
     if title:
         f["TITLE"] = [title]
@@ -543,6 +559,14 @@ def write_flac_tags(path, title="", artist="", lyrics_lrc="", comment="", lyrics
         f["UNSYNCEDLYRICS"] = [lyrics_plain]
     if comment:
         f["COMMENT"] = [comment]
+    if cover and os.path.exists(cover):
+        pic = Picture()
+        pic.type = 3  # front cover
+        pic.mime = "image/jpeg"
+        pic.desc = "cover"
+        with open(cover, "rb") as cf:
+            pic.data = cf.read()
+        f.add_picture(pic)
     f.save()
 
 
@@ -575,6 +599,7 @@ def cmd_apply(args):
         with open(cuts_path, "r", encoding="utf-8") as f:
             meta = json.load(f)
     url = meta.get("url", "")
+    cover = os.path.join(outdir, "cover.jpg")
 
     for seg in data["segments"]:
         theme = (seg.get("theme") or "").strip()
@@ -607,9 +632,9 @@ def cmd_apply(args):
         dst = os.path.join(outdir, f"{num}_{sanitize(theme)}.flac")
         # 1) ffmpeg 纯拷贝改名 (不写 metadata, 保持流完整)
         run(ffmpeg_cmd(ffmpeg, ["-i", src, "-c", "copy", dst]))
-        # 2) mutagen 写标签 (embedded): LYRICS=LRC滚动歌词, UNSYNCEDLYRICS=纯文本
+        # 2) mutagen 写标签 (embedded): LYRICS=LRC滚动歌词, UNSYNCEDLYRICS=纯文本 + 封面
         comment = f"源:{url} 段:{seg.get('start_str','')}-{seg.get('end_str','')}"
-        write_flac_tags(dst, theme, meta.get("title_hint", ""), lrc, comment, lyrics)
+        write_flac_tags(dst, theme, meta.get("title_hint", ""), lrc, comment, lyrics, cover)
         try:
             os.remove(src)
         except OSError as e:
@@ -750,6 +775,8 @@ def main():
                          help="yt-dlp 格式选择器, 默认 bestaudio/best (YouTube 想省流量可试 worst[acodec!=none])")
     p_split.add_argument("--yt-client", default=None,
                          help="YouTube player client: android(默认,免cookie) / tv(配cookie解锁高画质)")
+    p_split.add_argument("--tail-pad", type=float, default=3.0,
+                         help="成品 FLAC 结尾追加静音秒数 (默认 3.0, 设 0 关闭)")
     p_split.add_argument("--ffmpeg", default=None)
     p_split.add_argument("--ytdlp", default=None)
     p_split.set_defaults(func=cmd_split)
