@@ -53,6 +53,16 @@ python bili_split.py selftest --model models/faster-whisper-small
 - ffmpeg 用 **portable 版**（zip 解压），不要装商店版；解压后 `bin` 目录加入 PATH，或设 `FFMPEG_PATH=D:\path\to\ffmpeg\bin\ffmpeg.exe`
 - 沙箱/受限环境下脚本删除中间文件可能被拦截——属已知行为，脚本会降级继续，不影响成品
 
+### 🖥️ 换电脑 / 新机器注意事项
+
+仓库不包含模型、Cookie、本机工具路径和代理，**换电脑后必须补齐**：
+
+1. 装依赖（Python / ffmpeg / yt-dlp / node）→ 设 `FFMPEG_PATH`/`YTDLP_PATH`/`NODE_PATH` → `pip install faster-whisper mutagen opencc-python-reimplemented`
+2. 重新下载模型：`python bili_split.py fetch-model --name small`
+3. **代理**：脚本默认走 `127.0.0.1:7890`（本机 Clash），新机器没有 → YouTube 下载会失败，需用 `--proxy <你的代理>` 覆盖；**B 站不需要代理**，直接可用
+4. **Cookie**：`cookies.txt` 不入库，新机器没有 → YouTube 匿名下载（音质 360p/44k，功能完整）；要高音质需重新提供登录 Cookie（`import-cookies` 导入）
+5. 跑 `selftest` 确认工具链就绪
+
 ## 🔄 完整使用流程（4 步）
 
 > 交给 AI 时：让 AI 读取本仓库（AGENTS.md 有完整 AI 指令），它就知道怎么做。

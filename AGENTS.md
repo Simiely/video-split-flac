@@ -3,6 +3,25 @@
 > 📌 **文档基线**：2026-08-31（commit `23d74f2`）完成四件套重写；0.2.0 工作流文档化
 > **更新文档/代码后，请更新此行**（日期 + 新 commit hash），并在 CHANGELOG 追加版本
 
+## 🖥️ 新电脑 / 跨机器使用（clone 后必读）
+
+仓库**不含**：模型（models/ 已 gitignore）、Cookie（cookies.txt 已 gitignore）、本机工具路径、代理。换电脑后必须自己补齐：
+
+1. **装依赖**：Python 3.13+、ffmpeg（portable 解压即可）、yt-dlp（`pip install -U yt-dlp`）、node 18+
+2. **配环境变量**：`FFMPEG_PATH` / `YTDLP_PATH` / `NODE_PATH` 指向新机器工具路径（或加入 PATH）
+3. **装 Python 包**：`pip install faster-whisper mutagen opencc-python-reimplemented`
+4. **下载模型**：`python bili_split.py fetch-model --name small`（国内镜像加速）
+5. **自测**：`python bili_split.py selftest --model models/faster-whisper-small`
+
+**跨机器差异（重要）**：
+
+| 本机有 | 新机器没有 | 影响与处理 |
+|---|---|---|
+| 代理 `127.0.0.1:7890` | 无代理 | **YouTube 下载失败**。需自备代理，用 `--proxy <你的代理>` 覆盖 |
+| `cookies.txt`（登录态） | 无 Cookie | YouTube 降级匿名下载（360p/44k 音质），功能可用；要高音质需重新提供 cookie 并 `import-cookies` |
+| 已下载模型 | 无模型 | 必须执行 `fetch-model`，否则 split 报模型错误 |
+| B 站 | — | **B 站全程不需要代理/Cookie**，新机器直接可用 |
+
 ## ⭐ AI 端到端工作流（下次读仓库照此执行）
 
 **目标**：用户想要"从视频出音乐（分段 FLAC + 滚动歌词 + 封面 + 上传）"，按下面 4 步走。
