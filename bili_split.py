@@ -36,6 +36,10 @@ import wave
 # ---- 工具路径解析（环境变量 > PATH，无硬编码本机路径）----
 # 可设置: FFMPEG_PATH / YTDLP_PATH / NODE_PATH 指向本机工具
 def _tool_path(env_name):
+    """
+    读取环境变量指向的工具路径。
+    未设置时返回 None (后续由 find_exe 走 PATH 探测)。
+    """
     v = os.environ.get(env_name, "").strip()
     return v or None
 
@@ -59,10 +63,18 @@ PROXY_DEFAULT = "http://127.0.0.1:7890"  # YouTube 默认代理
 
 
 def log(msg):
+    """
+    统一前缀日志输出。
+    写 stdout 并实时 flush, 便于后台任务流式查看进度。
+    """
     print(f"[bili_split] {msg}", flush=True)
 
 
 def find_exe(name, given, default):
+    """
+    定位外部工具可执行文件。
+    优先级: 命令行参数 > 环境变量默认 > PATH; 全找不到则报错并提示对应环境变量。
+    """
     if given:
         return given
     cands = [default, shutil.which(name)]
@@ -107,11 +119,19 @@ def parse_cuts(spec):
 
 
 def run(cmd, **kw):
+    """
+    执行外部命令 (check=True, 失败即抛 CalledProcessError)。
+    执行前打印完整命令行, 便于排查。
+    """
     log("$ " + " ".join(cmd))
     return subprocess.run(cmd, check=True, **kw)
 
 
 def ffmpeg_cmd(exe, args):
+    """
+    组装 ffmpeg 命令。
+    统一前置 -hide_banner / -loglevel error / -y, 避免噪音输出。
+    """
     return [exe, "-hide_banner", "-loglevel", "error", "-y"] + args
 
 
@@ -172,6 +192,10 @@ def write_netscape_cookies(path, cookie_str, domain=".bilibili.com"):
 
 
 def find_node():
+    """
+    定位 node 可执行文件。
+    yt-dlp 新版解算 JS 挑战依赖 node; 找不到返回 None (不强制)。
+    """
     for c in [NODE_DEFAULT, shutil.which("node")]:
         if c and os.path.exists(c):
             return c
@@ -322,6 +346,10 @@ def fetch_title(ytdlp, url, ffmpeg_bin, proxy, site, yt_client="android"):
 
 
 def build_dl_cmd(ytdlp, ffmpeg_bin, proxy, site, yt_client, args, tmp, fmt):
+    """
+    组装 yt-dlp 下载命令。
+    cookie 三来源优先级: --cookies-text > --cookies 文件 > --browser 登录态。
+    """
     dl_cmd = ytdlp_base(ytdlp, ffmpeg_bin, proxy, site, yt_client) + \
         ["-f", fmt, "-o", os.path.join(tmp, "audio.%(ext)s")]
     if args.cookies_text:
@@ -421,6 +449,10 @@ def transcribe_segments(model, segments, subs_timed, title, outdir, tmp, args):
 # ---------------- 阶段一: split ----------------
 
 def cmd_split(args):
+    """
+    阶段一: 下载 → 解码 → 切割 → 歌词(字幕优先/Whisper 回退) → 主题模板。
+    产出 seg_XX.flac / seg_XX.txt / seg_XX.lrc / cuts.json / themes.json。
+    """
     ffmpeg = find_exe("ffmpeg", args.ffmpeg, FFMPEG_DEFAULT)
     ytdlp = find_exe("yt-dlp", args.ytdlp, YTDLP_DEFAULT)
     cuts = parse_cuts(args.cuts)
@@ -520,10 +552,18 @@ ILLEGAL = re.compile(r'[\\/:*?"<>|\r\n\t]')
 
 
 def sanitize(name):
+    """
+    清洗文件名非法字符。
+    Windows 保留字符替换为下划线, 并去除首尾点号。
+    """
     return ILLEGAL.sub("_", name).strip().strip(".")
 
 
 def cmd_apply(args):
+    """
+    阶段二: 读 themes.json → 逐段重命名 NN_主题.flac。
+    用 mutagen 嵌入 LYRICS(LRC滚动) + UNSYNCEDLYRICS(纯文本) 等标准标签。
+    """
     ffmpeg = find_exe("ffmpeg", args.ffmpeg, FFMPEG_DEFAULT)
     outdir = os.path.abspath(args.out)
     themes_path = args.themes or os.path.join(outdir, "themes.json")
@@ -683,6 +723,10 @@ def cmd_selftest(args):
 # ---------------- main ----------------
 
 def main():
+    """
+    CLI 入口: argparse 子命令分发。
+    5 个子命令: split / apply / selftest / fetch-model / import-cookies。
+    """
     ap = argparse.ArgumentParser(description="B站/YouTube 视频分段 + FLAC + Whisper 歌词 + 主题命名")
     sub = ap.add_subparsers(dest="cmd", required=True)
 

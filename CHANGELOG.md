@@ -1,5 +1,14 @@
 # CHANGELOG.md
 
+## [0.3.3] - 2026-08-31
+
+注释补齐（radon MI 驱动）。
+
+- 11 个缺 docstring 的函数补全多行 docstring（工具函数 + 命令入口 + main）
+- radon MI: B(16.22) → **A(20.05)**（注释率提升，A 级可维护性）
+- 圈复杂度无回归：平均 A(4.89)
+- 验证：selftest 通过 / CLI 正常
+
 ## [0.3.2] - 2026-08-31
 
 cmd_split 圈复杂度拆分（radon 实测驱动）。
