@@ -1,5 +1,20 @@
 # CHANGELOG.md
 
+## [0.2.0] - 2026-08-31
+
+工作流文档化 + 歌曲库按视频分目录。
+
+### 新增
+- AGENTS.md 写全 AI 端到端工作流（4 步：给网址 → 收链接时间戳 → split/apply → 上传 songs/<视频ID>/）
+- README 新增「完整使用流程」章节（输入模板页 / YouTube / B站 三个网址）+ 歌曲库目录结构
+- songs/ 按视频 ID 分子文件夹（songs/<视频ID>/），含总索引 README
+- split 新增 --subs-lang（YouTube 官方字幕优先，zh-Hant → 简体，失败回退 Whisper）
+- 歌词繁转简（OpenCC t2s，split 自动）
+
+### 修复
+- 网易云歌词：LYRICS 重建标准 LRC 头 [ti:][ar:][al:]（对照 MusicTag 格式）
+- 歌名校准为经典儿歌标准名（老麦克唐纳有个农场/小金鱼/头肩膀膝盖脚趾等）
+
 ## [0.1.3] - 2026-08-31
 
 - LYRICS 写入改为标准 LRC 完整头 [ti:][ar:][al:]（网易云音乐兼容，参考 MusicTag v1.0.9 写入格式）

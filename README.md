@@ -53,14 +53,39 @@ python bili_split.py selftest --model models/faster-whisper-small
 - ffmpeg 用 **portable 版**（zip 解压），不要装商店版；解压后 `bin` 目录加入 PATH，或设 `FFMPEG_PATH=D:\path\to\ffmpeg\bin\ffmpeg.exe`
 - 沙箱/受限环境下脚本删除中间文件可能被拦截——属已知行为，脚本会降级继续，不影响成品
 
+## 🔄 完整使用流程（4 步）
+
+> 交给 AI 时：让 AI 读取本仓库（AGENTS.md 有完整 AI 指令），它就知道怎么做。
+
+1. **打开输入模板**（填链接 + 分段时间戳，自动生成命令）：
+   🌐 **https://simiely.github.io/video-split-flac/**
+2. **找视频**（两个来源）：
+   - YouTube：https://www.youtube.com/
+   - 哔哩哔哩：https://www.bilibili.com/
+3. **把「链接 + 时间戳」发给 AI** → AI 跑 `split --subs-lang zh-Hant` → 读歌词填主题 → `apply` 出 `NN_主题.flac`（FLAC + 滚动歌词 + 封面）
+4. **AI 上传到 `songs/<视频ID>/` 子文件夹**（每个视频一个目录，见下方结构）
+
+### 歌曲库结构（songs/）
+
+```
+songs/
+├── README.md            # 总索引（每个视频一行）
+└── <视频ID>/            # 视频 ID = 链接 ?v= 后的部分
+    ├── NN_歌名.flac × N # 成品（内嵌 LRC 滚动歌词 + 封面）
+    ├── NN_歌名.lrc × N  # 同名歌词（网易云音乐兼容）
+    ├── cover.jpg        # 频道头像封面
+    └── README.md        # 该视频的复现命令 + 清单
+```
+
 ## 快速开始
 
 ```bash
-# ① 下载 → 按时间戳切段 → Whisper 转写歌词（含 LRC 时间戳）
+# ① 下载 → 按时间戳切段 → 歌词（优先 YouTube 官方字幕，失败回退 Whisper）
 python bili_split.py split \
   --url "https://www.bilibili.com/video/BV1xxxxxxxx" \
   --cuts "0:00-12:34, 12:34-25:00" \
   --model "models/faster-whisper-small" \
+  --subs-lang zh-Hant \
   --out ./output
 
 # ② 读取各 seg_XX.txt 歌词 → 在 output/themes.json 填入每段 theme（4-8字主题）
@@ -82,7 +107,10 @@ output/
 
 ### 输入模板页
 
-`input_template.html` 是可视化输入助手：填链接 + 动态增删分段 → 实时生成命令 → 一键复制。直接浏览器打开即可。
+`input_template.html` 是可视化输入助手：填链接 + 动态增删分段（时/分/秒拆分输入）→ 实时生成命令 → 一键复制。
+
+- **在线使用**：🌐 https://simiely.github.io/video-split-flac/（GitHub Pages，任何浏览器可开）
+- 本地使用：直接浏览器打开 `input_template.html`
 
 ### YouTube 说明
 
