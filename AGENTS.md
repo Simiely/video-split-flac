@@ -1,6 +1,6 @@
 # AGENTS.md · 项目规则（AI 工作流指令）
 
-> 📌 **文档基线**：2026-08-31（commit `31b2788`）完成四件套重写；0.2.0 工作流文档化
+> 📌 **文档基线**：2026-08-31（commit `31b02e4`）0.3.5 结尾空白 --tail-pad
 > **更新文档/代码后，请更新此行**（日期 + 新 commit hash），并在 CHANGELOG 追加版本
 
 ## 🖥️ 新电脑 / 跨机器使用（clone 后必读）
@@ -70,8 +70,15 @@ songs/<视频ID>/          ← 视频 ID 取链接 ?v= 后的部分（如 ss2rbg
 ├── NN_歌名.flac × N    ← 成品
 ├── NN_歌名.lrc × N     ← 同名歌词（网易云兼容）
 ├── cover.jpg           ← 频道头像封面（从频道页 og:image 抓取，900x900）
-└── README.md           ← 复现命令 + 清单
+└── README.md           ← 复现命令 + 清单（含时长列 + 歌词来源标注）
 ```
+
+整理用 `organize_songs.py`（一条命令出 flac+lrc+cover+README）：
+```bash
+python organize_songs.py --lyrics-source whisper   # Whisper 转写（非官方歌词）
+python organize_songs.py --lyrics-source subs      # YouTube 官方字幕
+```
+歌词为 Whisper 转写（无字幕轨道）时，README 会标注「非官方歌词，待后续更新」。
 
 上传规则：
 - **小文件**（总量 <20MB）：git add + commit + push（走代理 `-c http.https://github.com.proxy=http://127.0.0.1:7890`）
@@ -95,6 +102,7 @@ songs/<视频ID>/          ← 视频 ID 取链接 ?v= 后的部分（如 ss2rbg
 - **官方字幕优先**：`--subs-lang zh-Hant`（android client 免 PO token 可下）。zh-CN 轨道是拼音，zh-Hant 是汉字（转简体用）。
 - **网易云歌词兼容**：`LYRICS` 内容必须是**标准 LRC 完整头**（`[ti:歌名]`+`[ar:]`+`[al:]`+时间戳行），缺头网易云不认（参考 MusicTag 写入格式）。
 - **VAD 默认关闭**：`vad_filter=True` 会把音乐/歌曲当噪声滤成 0 字。讲课类可 `--vad`。
+- **结尾空白（--tail-pad）**：默认每段成品 FLAC 结尾追加 3 秒静音（`apad=pad_dur`），只作用于成品；whisper 转写走 `cut_wav16` 不加，歌词时间戳不变。想精确截止设 `--tail-pad 0`。
 - **FLAC 歌词字段大写**：`LYRICS` + `UNSYNCEDLYRICS` 用 **mutagen** 写；ffmpeg `-metadata lyrics=` 写小写不认。
 - **Windows 沙箱**：`os.remove`/`shutil.copy2` 对 git 跟踪文件可能被钩子静默拦截——批量文件操作用提权执行或 try/except 降级。
 - **本机网络**：境外流量代理 `127.0.0.1:7890`；GitHub API 用 node fetch 直连（不用 curl/git）；curl/git 子进程访问境外常被 Clash 分流拦成 000/断连。
