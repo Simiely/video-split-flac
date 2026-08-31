@@ -1,5 +1,21 @@
 # CHANGELOG.md
 
+## [0.3.0] - 2026-08-31
+
+代码结构优化（主线/支线分离 + 修复隐患）。
+
+### 修复
+- **fetch-model 隐式依赖 bug**：`urllib.request` 从未显式导入，独立进程下首次运行必崩 NameError——顶部补 `import urllib.request`，实测下载通路正常（含镜像失败→代理兜底降级）
+
+### 重构（依据 line-of-sight / flat-success-path / DRY 调研结论）
+- **client 轮询抽离主流程**：YouTube 多 client 降级（current→web→android→tv）从 cmd_split 内联 15 行收敛为独立函数 `download_audio()`，主流程恢复 1 行调用；实测 tv 限流→web 自动降级正常
+- **字幕决策收敛**：官方字幕获取+分段切分抽为 `collect_subs_timed()`，cmd_split 歌词来源判定从 14 行缩为 3 行
+- **cookie Netscape 行构造去重**：抽 `netscape_line()`，`write_netscape_cookies` 与 `import-cookies` 共用（DRY，逐字节格式断言验证）
+- **注释编号连续化**：cmd_split 步骤 #0-#5（原 #4/#5/#6 断档修复）
+
+### 明确不做（防过度设计）
+- 不拆多文件（695 行 < 1000 行标准）；不引入 dataclass context（6 参数调用点集中，收益低）
+
 ## [0.2.1] - 2026-08-31
 
 跨机器使用说明补充。
