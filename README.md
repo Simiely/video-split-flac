@@ -14,20 +14,44 @@
 - ✅ 按歌词内容提炼主题，自动命名 `01_主题.flac`
 - ✅ YouTube 自动走代理 / 自动识别登录 Cookie / 限流自动降级
 
-## 安装
+## 环境准备（重要：拉下来先看这里）
 
-依赖：Python 3.13+、[ffmpeg](https://www.gyan.dev/ffmpeg/builds/)（加入 PATH 或指定路径）、yt-dlp。
+本项目**不打包工具**，运行时依赖 4 个外部工具，缺一不可。每个都可以用两种方式提供：
+
+| 工具 | 版本要求 | 获取方式 | 如何让脚本找到它 |
+|---|---|---|---|
+| Python | 3.13+ | python.org 或 WorkBuddy | 直接 `python` 命令 |
+| ffmpeg | 任意较新版本 | [gyan.dev 官方构建](https://www.gyan.dev/ffmpeg/builds/)（下载后解压即可，无需安装） | 加入 PATH，或设环境变量 `FFMPEG_PATH` |
+| yt-dlp | 2026.07+ | `pip install -U yt-dlp` 或 [GitHub release](https://github.com/yt-dlp/yt-dlp/releases) | 加入 PATH，或设 `YTDLP_PATH` |
+| node | 18+ | nodejs.org | 加入 PATH，或设 `NODE_PATH` |
+
+> **路径查找顺序**：命令行参数（`--ffmpeg` 等）→ 环境变量（`FFMPEG_PATH` / `YTDLP_PATH` / `NODE_PATH`）→ 系统 PATH。
+> 报错 `找不到 ffmpeg` / `找不到 yt-dlp` / `找不到 node` 时，按上表配置即可。
+
+**为什么需要 node**：新版 yt-dlp 对 YouTube 做 JS 挑战解算依赖 JS runtime。没有 node 会出现 `No supported JavaScript runtime` 警告，导致 YouTube 部分格式缺失或签名失败——**不是必须但有它才完整**。
+
+### 安装步骤（一条条来）
 
 ```bash
-# 1. Python 依赖
+# 1. Python 依赖（核心）
 pip install faster-whisper mutagen
 
-# 2. yt-dlp（已随包管理可用则跳过）
+# 2. yt-dlp（保持最新）
 pip install -U yt-dlp
 
-# 3. 下载 Whisper 中文识别模型（国内镜像加速）
+# 3. 下载 Whisper 模型（国内镜像加速，约 480MB）
 python bili_split.py fetch-model --name small
+#    模型下载到 models/faster-whisper-small/，--model 传这个目录即可
+
+# 4. 自测工具链（可选但强烈建议：拉下来先跑这个）
+python bili_split.py selftest --model models/faster-whisper-small
+#    通过标准：输出"自测通过: 工具链可用"
 ```
+
+### Windows 注意
+
+- ffmpeg 用 **portable 版**（zip 解压），不要装商店版；解压后 `bin` 目录加入 PATH，或设 `FFMPEG_PATH=D:\path\to\ffmpeg\bin\ffmpeg.exe`
+- 沙箱/受限环境下脚本删除中间文件可能被拦截——属已知行为，脚本会降级继续，不影响成品
 
 ## 快速开始
 
@@ -62,13 +86,27 @@ output/
 
 ### YouTube 说明
 
-- 自动走本机代理（`http://127.0.0.1:7890`，可用 `--proxy` 覆盖）
+- 自动走本机代理（默认 `http://127.0.0.1:7890`，可用 `--proxy` 覆盖；国内直连 YouTube 会失败）
 - 匿名下载稳定但音质一般（360p/44k）；配登录 Cookie 解锁 1080p + 128k 音频：
 
 ```bash
 python bili_split.py import-cookies --input cookies.json   # EditThisCookie 导出 → cookies.txt
 python bili_split.py split --url ... --cookies cookies.txt ...
 ```
+
+## 拉下来运行不成功？排查清单
+
+| 现象 | 原因 | 解决 |
+|---|---|---|
+| `找不到 ffmpeg` | ffmpeg 未装或不在 PATH | 下载 portable 版，设 `FFMPEG_PATH` 或加 PATH |
+| `找不到 yt-dlp` | 未安装 | `pip install -U yt-dlp` 或设 `YTDLP_PATH` |
+| `找不到 node` | 未安装 | 装 node 并设 `NODE_PATH`（没有也能跑 B 站，YouTube 会缺格式） |
+| 模型报错/下载失败 | 模型目录不存在或自动下载被网络墙 | 先跑 `fetch-model --name small` 下载到本地，`--model` 用**本地目录路径** |
+| YouTube `HTTP Error 403` | 代理 IP 被 YouTube bot 检测 | 脚本默认 android client，一般可绕过；仍失败可 `--yt-client web` 或配 cookie |
+| YouTube `The page needs to be reloaded` | tv client 被限流（偶发） | 脚本已自动降级 web 重试；重试一次即可 |
+| 歌词转写为空 | 歌曲被 VAD 误判为噪声 | 默认已关 VAD；确认没手动加 `--vad` |
+| 播放器不显示歌词 | 标签字段名问题 | 成品用 mutagen 写大写 `LYRICS`（LRC）+ `UNSYNCEDLYRICS`，foobar2000/Mp3tag 可读 |
+| Windows 提示删除文件失败 | 沙箱回收站限制 | 已知行为，不影响成品，手动删即可 |
 
 ## 常用命令
 
@@ -78,7 +116,7 @@ python bili_split.py split --url ... --cookies cookies.txt ...
 | `apply --out` | 填好主题后：重命名+嵌歌词 |
 | `fetch-model --name small/medium` | 下载 Whisper 模型（镜像加速） |
 | `import-cookies --input x.json` | Cookie JSON → cookies.txt |
-| `selftest --model` | 离线自测工具链 |
+| `selftest --model` | 离线自测工具链（拉下来先跑） |
 | `split ... --vad` | 讲课类可开 VAD 静音过滤 |
 | `split ... --yt-client tv` | 强制高音质 client |
 
