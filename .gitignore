@@ -20,3 +20,6 @@ test_apply_out/
 # 临时核查脚本
 check_repo_tmp.js
 *tmp*.js
+
+# 本地临时文件
+channel_avatar.jpg
