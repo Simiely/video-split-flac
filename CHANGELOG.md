@@ -1,5 +1,14 @@
 # CHANGELOG.md
 
+## [0.3.2] - 2026-08-31
+
+cmd_split 圈复杂度拆分（radon 实测驱动）。
+
+- radon 实测 cmd_split 圈复杂度 D(24)（McCabe 阈值 >20 必须重构），拆分后降至 **B(8)**
+- 新增 4 个小函数：`resolve_proxy` / `resolve_yt_client` / `find_audio` / `transcribe_segments`（均 A/B 级）
+- 主流程第 0/1/4 步各收敛为 1 行调用；转写循环 28 行内联 → 独立函数
+- 平均复杂度 A(4.89)；验证：selftest 通过 / 真实 split（tv 限流→降级→转写）正常
+
 ## [0.3.1] - 2026-08-31
 
 代码卫生（死代码 + magic number + 分发模式）。

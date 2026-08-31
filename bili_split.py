@@ -360,6 +360,64 @@ def download_audio(ytdlp, ffmpeg_bin, proxy, site, yt_client, args, tmp, fmt):
     raise last_err
 
 
+def resolve_proxy(args, site):
+    """YouTube 默认走本机代理 (国内直连被墙); 可 --proxy 显式指定"""
+    if args.proxy:
+        return args.proxy
+    if site == "youtube":
+        log(f"YouTube 检测, 自动使用代理 {PROXY_DEFAULT} (可用 --proxy 覆盖)")
+        return PROXY_DEFAULT
+    return None
+
+
+def resolve_yt_client(site, has_cookie, given):
+    """YouTube player client 选择: 显式指定优先; 有 cookie 用 tv(解锁高画质), 否则 android(免登录)"""
+    if given:
+        return given
+    if site == "youtube" and has_cookie:
+        return "tv"
+    return "android"
+
+
+def find_audio(tmp):
+    """在 tmp 目录定位 yt-dlp 下载的音轨文件 (audio.*)"""
+    for f in os.listdir(tmp):
+        if f.startswith("audio."):
+            return os.path.join(tmp, f)
+    return None
+
+
+def transcribe_segments(model, segments, subs_timed, title, outdir, tmp, args):
+    """逐段生成歌词 (优先官方字幕时间戳, 否则 Whisper 转写), 产出 seg_XX.txt/.lrc 并回填 segments"""
+    for seg in segments:
+        wav16 = os.path.join(tmp, f"{seg['tag']}_w16.wav")
+        txt = os.path.join(outdir, f"{seg['tag']}.txt")
+        lrc_path = os.path.join(outdir, f"{seg['tag']}.lrc")
+        log(f"转写 {seg['tag']} ({seg['start_str']} - {seg['end_str']}) ...")
+        if subs_timed and seg["idx"] in subs_timed:
+            timed = subs_timed[seg["idx"]]
+            info_lang = args.subs_lang
+        else:
+            seg_iter, info = model.transcribe(wav16, language=args.lang or None,
+                                              beam_size=5, vad_filter=args.vad)
+            timed = [(s.start, s.text.strip()) for s in seg_iter if s.text.strip()]
+            info_lang = info.language
+        text = "\n".join(t for _, t in timed)
+        text = to_simplified(text)  # 繁体 -> 简体
+        with open(txt, "w", encoding="utf-8") as f:
+            f.write(text + "\n")
+        # LRC 同步歌词 (embedded 滚动歌词; 标准头 [ti:][ar:][al:] + [mm:ss.xx] 时间戳)
+        lrc = to_simplified(build_lrc(timed, title, artist=title, album=title))
+        with open(lrc_path, "w", encoding="utf-8") as f:
+            f.write(lrc + "\n")
+        seg["lang"] = info_lang
+        seg["lyrics_file"] = f"{seg['tag']}.txt"
+        seg["lrc_file"] = f"{seg['tag']}.lrc"
+        seg["lyrics_preview"] = text[:60].replace("\n", " / ")
+        src = "字幕" if (subs_timed and seg["idx"] in subs_timed) else "whisper"
+        log(f"  -> {len(text)} 字, {len(timed)} 句(带时间戳), 来源 {src}")
+
+
 # ---------------- 阶段一: split ----------------
 
 def cmd_split(args):
@@ -373,26 +431,19 @@ def cmd_split(args):
 
     site = detect_site(args.url)
     log(f"站点识别: {site} | {args.url}")
-    # YouTube 默认走本机代理 (国内直连被墙); 也可 --proxy 显式指定
-    proxy = args.proxy
-    if not proxy and site == "youtube":
-        proxy = PROXY_DEFAULT
-        log(f"YouTube 检测, 自动使用代理 {proxy} (可用 --proxy 覆盖)")
+    proxy = resolve_proxy(args, site)
 
     # 0. 先取标题（apply 阶段写 artist 标签）
     ffmpeg_bin = os.path.dirname(ffmpeg)
     has_cookie = bool(args.cookies or args.cookies_text or args.browser)
-    yt_client = args.yt_client or ("tv" if (site == "youtube" and has_cookie) else "android")
+    yt_client = resolve_yt_client(site, has_cookie, args.yt_client)
     title = fetch_title(ytdlp, args.url, ffmpeg_bin, proxy, site, yt_client)
     log(f"视频标题: {title or '(获取失败)'}")
 
     # 1. 下载最佳音轨 (YouTube 多 client 轮询: 当前client -> web -> android -> tv)
     log(f"下载音轨: {args.url}")
     download_audio(ytdlp, ffmpeg_bin, proxy, site, yt_client, args, tmp, args.format)
-    audio = None
-    for f in os.listdir(tmp):
-        if f.startswith("audio."):
-            audio = os.path.join(tmp, f)
+    audio = find_audio(tmp)
     if not audio:
         raise SystemExit("下载失败: 未找到音轨文件")
 
@@ -426,34 +477,7 @@ def cmd_split(args):
     log(f"加载 Whisper 模型: {args.model} (首次会自动下载, 走 hf-mirror 镜像)")
     from faster_whisper import WhisperModel
     model = WhisperModel(args.model, device="cpu", compute_type="int8")
-    for seg in segments:
-        wav16 = os.path.join(tmp, f"{seg['tag']}_w16.wav")
-        txt = os.path.join(outdir, f"{seg['tag']}.txt")
-        lrc_path = os.path.join(outdir, f"{seg['tag']}.lrc")
-        log(f"转写 {seg['tag']} ({seg['start_str']} - {seg['end_str']}) ...")
-        lang = args.lang or None
-        if subs_timed and seg["idx"] in subs_timed:
-            timed = subs_timed[seg["idx"]]
-            info_lang = args.subs_lang
-        else:
-            seg_iter, info = model.transcribe(wav16, language=lang,
-                                              beam_size=5, vad_filter=args.vad)
-            timed = [(s.start, s.text.strip()) for s in seg_iter if s.text.strip()]
-            info_lang = info.language
-        text = "\n".join(t for _, t in timed)
-        text = to_simplified(text)  # 繁体 -> 简体
-        with open(txt, "w", encoding="utf-8") as f:
-            f.write(text + "\n")
-        # LRC 同步歌词 (embedded 滚动歌词; 标准头 [ti:][ar:][al:] + [mm:ss.xx] 时间戳)
-        lrc = to_simplified(build_lrc(timed, title, artist=title, album=title))
-        with open(lrc_path, "w", encoding="utf-8") as f:
-            f.write(lrc + "\n")
-        seg["lang"] = info_lang
-        seg["lyrics_file"] = f"{seg['tag']}.txt"
-        seg["lrc_file"] = f"{seg['tag']}.lrc"
-        seg["lyrics_preview"] = text[:60].replace("\n", " / ")
-        src = "字幕" if (subs_timed and seg["idx"] in subs_timed) else "whisper"
-        log(f"  -> {len(text)} 字, {len(timed)} 句(带时间戳), 来源 {src}")
+    transcribe_segments(model, segments, subs_timed, title, outdir, tmp, args)
 
     # 5. 主题模板
     themes = os.path.join(outdir, "themes.json")
