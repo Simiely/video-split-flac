@@ -187,14 +187,93 @@ def fmt_lrc_time(t):
     return f"{m:02d}:{s:05.2f}"
 
 
-def build_lrc(segments, title=""):
-    """带时间戳的转写结果 -> LRC 同步歌词文本 (嵌入式滚动歌词标准格式)"""
+def to_simplified(text):
+    """繁体转简体 (OpenCC t2s)。兼容 LRC: 保留 [时间戳]/[标签] 前缀, 只转文本部分。
+    未安装 opencc 时原样返回。"""
+    try:
+        from opencc import OpenCC
+        cc = OpenCC("t2s")
+    except ImportError:
+        return text
+    out = []
+    for line in (text or "").splitlines():
+        if line.startswith("[") and "]" in line:
+            i = line.index("]")
+            out.append(line[:i + 1] + cc.convert(line[i + 1:]))
+        else:
+            out.append(cc.convert(line))
+    return "\n".join(out)
+
+
+def parse_vtt(path):
+    """解析 YouTube 字幕 VTT -> [(绝对秒, 文本), ...] (官方歌词来源)"""
+    cues = []
+    ts = None
+    parts = []
+    for raw in open(path, encoding="utf-8"):
+        line = raw.strip()
+        if "-->" in line:
+            if ts is not None and parts:
+                cues.append((ts, " ".join(parts)))
+            m = re.match(r"(\d+):(\d{2}):(\d{2}\.\d{3})\s*-->", line)
+            ts = (int(m.group(1)) * 3600 + int(m.group(2)) * 60 + float(m.group(3))) if m else None
+            parts = []
+        elif line and not line.startswith(("WEBVTT", "Kind:", "Language:")):
+            parts.append(line)
+    if ts is not None and parts:
+        cues.append((ts, " ".join(parts)))
+    return cues
+
+
+def fetch_subs(ytdlp, ffmpeg_bin, proxy, site, yt_client, args, tmp, lang):
+    """下载 YouTube 官方字幕 (zh-Hant 等, android client 无需 PO token) -> vtt 路径"""
+    cmd = ytdlp_base(ytdlp, ffmpeg_bin, proxy, site, yt_client) + [
+        "--write-subs", "--sub-langs", lang, "--sub-format", "vtt",
+        "--skip-download", "-o", os.path.join(tmp, "subs.%(ext)s"), args.url]
+    try:
+        subprocess.run(cmd, check=True, capture_output=True, text=True,
+                       encoding="utf-8", errors="replace", timeout=300)
+    except subprocess.CalledProcessError:
+        return None
+    for f in os.listdir(tmp):
+        if f.startswith("subs.") and f.endswith(".vtt"):
+            return os.path.join(tmp, f)
+    return None
+
+
+def build_lrc(segments, title="", artist="", album=""):
+    """带时间戳的转写结果 -> LRC 同步歌词文本 (标准头 [ti:][ar:][al:] + [mm:ss.xx] 行)
+
+    标准头必须写全: 网易云音乐等国产播放器解析 LYRICS 时需要 [ti:][ar:][al:] 头
+    (参考 MusicTag 写入格式: [ti:歌名]\\n[ar:歌手]\\n[al:专辑]\\n[00:00.00]...)
+    """
     lines = []
     if title:
         lines.append(f"[ti:{title}]")
+    if artist:
+        lines.append(f"[ar:{artist}]")
+    if album:
+        lines.append(f"[al:{album}]")
     for start, text in segments:
         lines.append(f"[{fmt_lrc_time(start)}]{text}")
     return "\n".join(lines)
+
+
+def rebuild_lrc_header(lrc, theme="", title_hint=""):
+    """重建 LRC 标准头: 去掉旧 [xx:] 头, 用主题/标题写全 [ti:][ar:][al:] (网易云兼容)"""
+    body = []
+    for line in (lrc or "").splitlines():
+        s = line.strip()
+        if s.startswith("[") and "]" in s:
+            tag = s[1:s.index("]")]
+            if re.match(r"^(ti|ar|al|by|offset|la|re|ve|au|length)$", tag, re.I):
+                continue  # 跳过旧头部标签
+        body.append(line)
+    header = f"[ti:{theme}]" if theme else ""
+    if title_hint:
+        header += f"\n[ar:{title_hint}]"
+        header += f"\n[al:{title_hint}]"
+    return (header + "\n" + "\n".join(body)).strip() if header else "\n".join(body)
 
 
 def fetch_title(ytdlp, url, ffmpeg_bin, proxy, site, yt_client="android"):
@@ -252,17 +331,25 @@ def cmd_split(args):
     title = fetch_title(ytdlp, args.url, ffmpeg_bin, proxy, site, yt_client)
     log(f"视频标题: {title or '(获取失败)'}")
 
-    # 1. 下载最佳音轨
+    # 1. 下载最佳音轨 (YouTube 多 client 轮询: 当前client -> web -> android -> tv)
     log(f"下载音轨: {args.url}")
-    dl_cmd = build_dl_cmd(ytdlp, ffmpeg_bin, proxy, site, yt_client, args, tmp, args.format)
-    try:
-        run(dl_cmd)
-    except subprocess.CalledProcessError:
-        if site == "youtube" and yt_client == "tv":
-            log("tv client 下载失败(可能被限流), 自动降级 web client 重试")
-            run(build_dl_cmd(ytdlp, ffmpeg_bin, proxy, site, "web", args, tmp, args.format))
+    if site == "youtube":
+        order = []
+        for c in (yt_client, "web", "android", "tv"):
+            if c not in order:
+                order.append(c)
+        last_err = None
+        for c in order:
+            try:
+                run(build_dl_cmd(ytdlp, ffmpeg_bin, proxy, site, c, args, tmp, args.format))
+                break
+            except subprocess.CalledProcessError as e:
+                last_err = e
+                log(f"{c} client 下载失败, 尝试下一个 client...")
         else:
-            raise
+            raise last_err
+    else:
+        run(build_dl_cmd(ytdlp, ffmpeg_bin, proxy, site, yt_client, args, tmp, args.format))
     audio = None
     for f in os.listdir(tmp):
         if f.startswith("audio."):
@@ -291,7 +378,23 @@ def cmd_split(args):
         json.dump({"url": args.url, "title_hint": title, "segments": segments},
                   f, ensure_ascii=False, indent=2)
 
-    # 5. Whisper 转写 (保留每句时间戳 -> 同步滚动歌词 LRC)
+    # 5. 歌词来源: 优先 YouTube 官方字幕(--subs-lang, 更准确), 否则 Whisper 转写
+    subs_timed = None
+    if args.subs_lang and site == "youtube":
+        subs_path = fetch_subs(ytdlp, ffmpeg_bin, proxy, site, yt_client, args, tmp, args.subs_lang)
+        if subs_path:
+            cues = parse_vtt(subs_path)
+            subs_timed = {}
+            for seg in segments:
+                st, en = seg["start"], seg["end"]
+                timed = [(round(t - st, 3), to_simplified(x))
+                         for t, x in cues if st <= t < en]
+                if timed:
+                    subs_timed[seg["idx"]] = timed
+            log(f"官方字幕 {args.subs_lang} 可用 ({len(cues)} 条 cue), 跳过 Whisper 转写")
+        else:
+            log(f"官方字幕 {args.subs_lang} 获取失败, 回退 Whisper 转写")
+
     log(f"加载 Whisper 模型: {args.model} (首次会自动下载, 走 hf-mirror 镜像)")
     from faster_whisper import WhisperModel
     model = WhisperModel(args.model, device="cpu", compute_type="int8")
@@ -301,21 +404,28 @@ def cmd_split(args):
         lrc_path = os.path.join(outdir, f"{seg['tag']}.lrc")
         log(f"转写 {seg['tag']} ({seg['start_str']} - {seg['end_str']}) ...")
         lang = args.lang or None
-        seg_iter, info = model.transcribe(wav16, language=lang,
-                                          beam_size=5, vad_filter=args.vad)
-        timed = [(s.start, s.text.strip()) for s in seg_iter if s.text.strip()]
+        if subs_timed and seg["idx"] in subs_timed:
+            timed = subs_timed[seg["idx"]]
+            info_lang = args.subs_lang
+        else:
+            seg_iter, info = model.transcribe(wav16, language=lang,
+                                              beam_size=5, vad_filter=args.vad)
+            timed = [(s.start, s.text.strip()) for s in seg_iter if s.text.strip()]
+            info_lang = info.language
         text = "\n".join(t for _, t in timed)
+        text = to_simplified(text)  # 繁体 -> 简体
         with open(txt, "w", encoding="utf-8") as f:
             f.write(text + "\n")
-        # LRC 同步歌词 (embedded 滚动歌词; 带 [ti:] 头与 [mm:ss.xx] 时间戳)
-        lrc = build_lrc(timed, title)
+        # LRC 同步歌词 (embedded 滚动歌词; 标准头 [ti:][ar:][al:] + [mm:ss.xx] 时间戳)
+        lrc = to_simplified(build_lrc(timed, title, artist=title, album=title))
         with open(lrc_path, "w", encoding="utf-8") as f:
             f.write(lrc + "\n")
-        seg["lang"] = info.language
+        seg["lang"] = info_lang
         seg["lyrics_file"] = f"{seg['tag']}.txt"
         seg["lrc_file"] = f"{seg['tag']}.lrc"
         seg["lyrics_preview"] = text[:60].replace("\n", " / ")
-        log(f"  -> {len(text)} 字, {len(timed)} 句(带时间戳), 语言 {info.language}")
+        src = "字幕" if (subs_timed and seg["idx"] in subs_timed) else "whisper"
+        log(f"  -> {len(text)} 字, {len(timed)} 句(带时间戳), 来源 {src}")
 
     # 6. 主题模板
     themes = os.path.join(outdir, "themes.json")
@@ -398,6 +508,8 @@ def cmd_apply(args):
                 lrc = f.read().strip()
         if not lrc:
             lrc = lyrics  # 兜底: 无时间戳时降级为纯文本
+        # 重建标准 LRC 头 (网易云兼容: [ti:歌名][ar:][al:] 必须写全)
+        lrc = rebuild_lrc_header(lrc, theme, meta.get("title_hint", ""))
         # 目标名: NN_主题.flac
         num = f"{seg.get('idx', 0):02d}"
         dst = os.path.join(outdir, f"{num}_{sanitize(theme)}.flac")
@@ -531,6 +643,8 @@ def main():
     p_split.add_argument("--lang", default=None, help="识别语言, 默认自动 (中文可指定 zh)")
     p_split.add_argument("--vad", action="store_true",
                          help="开启 VAD 静音过滤 (讲课类可开; 默认关闭以免过滤掉音乐/人声)")
+    p_split.add_argument("--subs-lang", default=None,
+                         help="优先用 YouTube 官方字幕作歌词 (如 zh-Hant, 比 Whisper 准确; 获取失败自动回退)")
     p_split.add_argument("--out", default="./output")
     p_split.add_argument("--browser", default=None, help="如 edge, 用浏览器登录态下载高清音轨")
     p_split.add_argument("--cookies", default=None, help="Netscape 格式 cookies.txt 文件路径 (B站高清需登录)")
