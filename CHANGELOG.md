@@ -1,5 +1,12 @@
 # CHANGELOG.md
 
+## 2026-11-18 · 文档维护：接入 repo-kit 机器层（link-only）
+
+- `schema/taxonomy.json` + `schema/kit.lock.json`（kit `2.9.0` / 规范 `2.1.4` / `link-only`）+ `tools/repo-kit/check_repo.py`
+- `.github/workflows/repo-check.yml`：md / `schema/**` / `tools/**` 变更时跑链接与锚点检查 + 锁哈希校验
+- 同日另：`AGENTS.md` 135 → 75 行，「AI 端到端工作流」62 行原样迁入 `rules/端到端工作流.md`
+- 只改文档基建，不动内容；验收 `REPO CHECK: PASS`（ERROR=0、WARN=0）、`KIT LOCK: PASS`
+
 ## [0.3.8] - 2026-08-31
 
 songs 整理 + README 生成流程固化。
